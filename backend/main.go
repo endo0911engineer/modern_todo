@@ -37,11 +37,55 @@ func addTodo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(newTodo)
 }
 
+// 更新リクエストに対応する関数
+func updateTodo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "application/json")
+
+	// パスからIDを取得
+	id := r.URL.Path[len("/todos/"):]
+
+	// 新しいデータを取得
+	var updatedTodo Todo
+	if err := json.NewDecoder(r.Body).Decode(&updatedTodo); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Todoを更新
+	for i, todo := range todos {
+		if todo.ID == id {
+			todos[i].Text = updatedTodo.Text
+			json.NewEncoder(w).Encode(todos[i])
+			return
+		}
+	}
+	http.Error(w, "todo not found", http.StatusNotFound)
+}
+
+// 削除リクエストに対応する関数
+func deleteTodo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// パスからIDを取得
+	id := r.URL.Path[len("/todos/"):]
+
+	// Todoを削除
+	for i, todo := range todos {
+		if todo.ID == id {
+			todos = append(todos[:i], todos[i+1:]...)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+	http.Error(w, "Todo not found", http.StatusNotFound)
+}
+
 // CORS対応のためのエントリポイント関数
 func handleTodos(w http.ResponseWriter, r *http.Request) {
 	// CORS設定
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	// OPTIONSメソッドの処理（プリフライトリクエストに対応）
@@ -56,6 +100,10 @@ func handleTodos(w http.ResponseWriter, r *http.Request) {
 		getTodos(w, r)
 	case "POST":
 		addTodo(w, r)
+	case "PUT":
+		updateTodo(w, r)
+	case "DELETE":
+		deleteTodo(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -63,6 +111,7 @@ func handleTodos(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/todos", handleTodos)
+	http.HandleFunc("/todos/", handleTodos) //特定のIDを扱うためのエンドポイント
 	fmt.Println("Server is running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
